@@ -7,6 +7,7 @@ javascript image cropper
 * You can crop the image and download it by click the part you want to crop.
 * The cropping area can be resized with the mouse wheel.
 * The image is displayed resized to the screen height, but the cropped image is the original size.
+* The cropped image file name original file name hashed with sha-256.
 * Test image
 ![](./test.png)
 * image source : google search(https://oralcancerfoundation.org/people/)
