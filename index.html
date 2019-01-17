@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>EasyCropper</title>
+	<script src="./jszip.min.js"></script>
+	<script src="./FileSaver.min.js"></script>
+	<script src="./sha256.js"></script>
+	<style>
+		html {
+			height: 100%;
+			padding: 0px;
+			margin: 0px;
+		}
+
+		body {
+			height: 100%;
+			padding: 0px;
+			margin: 0px;
+		}
+
+		#canvasFrame {
+			text-align: center;
+		}
+
+		#canvas {
+			border: solid 1px #000;
+			height: 80%;
+		}
+
+		#buttonFrame {
+			margin-top: 16px;
+			text-align: center;
+			display: flex;
+			justify-content: space-around;
+		}
+	</style>
+</head>
+
+<body>
+	<div id="canvasFrame">
+		<img id="imgTag" alt="">
+		<canvas id="canvas" onmousemove="onMove(event)" onclick='onClick(event)' onwheel="onWheel(event)"></canvas>
+	</div>
+	<div id="buttonFrame">
+		<input type="file" onchange="load(event)">
+		<button onclick="next()">Next</button>
+		<button onclick="onColor()">Box color</button>
+	</div>
+	<script>
+		var cnv = canvas
+		var ctx = cnv.getContext("2d")
+		var body = document.getElementsByTagName('body')[0]
+		var width = body.clientWidth
+		var height = body.clientHeight
+		cnv.width = width * 0.8
+		cnv.height = height * 0.9
+
+		var imgList = []
+		var imgIndex = 0
+		var cropIndex = 1
+		var fileName = ''
+
+		var r = 7
+		var l = r * 2
+		var rate = 0
+		var mouse = [50, 50]
+		var color = '#000'
+
+		String.prototype.hash = function () {
+			return CryptoJS.SHA256(this + '') + ''
+		}
+
+		function load(event) {
+			var file = event.target.files[0]
+			if (!file) return
+
+			var zip = new JSZip()
+			//Open zip file
+			zip.loadAsync(file)
+				//Convert zip contents into arraybuffer
+				.then(result => {
+					var promises = []
+					result.forEach(i => promises.push(zip.file(i).async('arraybuffer')))
+					return Promise.all(promises)
+				})
+				//Convert arraybuffer to blob and create object url
+				.then(r => r.map(file => window.URL.createObjectURL(new Blob([new Uint8Array(file)]))))
+				//Convert object url to image
+				.then(r => r.map(url => new Promise((resolve, reject) => {
+					var img = new Image()
+					img.onload = () => resolve(img)
+					img.src = url
+				})))
+				//Wait untill all promises end
+				.then(r => Promise.all(r))
+				//Add images to list and draw
+				.then(r => {
+					imgList = r
+					imgIndex = 0
+					cropIndex = 0
+					fileName = file.name
+					imLoad()
+				})
+				//Exception handling
+				.then({ success: true, message: 'Image loaded.' })
+				.catch(e => ({ success: false, message: e }))
+		}
+
+
+		function imLoad() {
+			var img = imgList[imgIndex]
+			cnv.height = height * 0.9
+			cnv.width = height * 0.9 * img.width / img.height
+			rate = img.height / cnv.height
+			ctx.drawImage(img, 0, 0, cnv.width, cnv.height)
+		}
+
+		function refresh() {
+			if (!imgList[imgIndex]) return
+			ctx.drawImage(imgList[imgIndex], 0, 0, cnv.width, cnv.height)
+			ctx.strokeStyle = color
+			ctx.beginPath()
+			ctx.rect((mouse[0] - r), (mouse[1] - r), l, l)
+			ctx.stroke()
+
+		}
+
+		function next() {
+			if (imgIndex < imgList.length) {
+				imgIndex++
+				refresh()
+			} else alert('Last file')
+		}
+
+		function onMove(event) {
+			mouse = [event.offsetX, event.offsetY]
+			refresh()
+		}
+
+		function onWheel(event) {
+			r += -event.deltaY / 40
+			r = Math.max(r, 7)
+			l = r * 2
+			refresh()
+		}
+
+		function onColor() {
+			if (color == '#000') color = '#fff'
+			else (color = '#000')
+		}
+
+		function dataURItoBlob(dataURI) {
+			var byteString = atob(dataURI.split(',')[1]);
+			var mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+			var ab = new ArrayBuffer(byteString.length);
+			var ia = new Uint8Array(ab);
+			for (var i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+			return new Blob([ab], { type: mimeString });
+		}
+
+		function onClick() {
+			if (imgList.length == 0) return
+			var lr = l * rate
+			cnv.width = cnv.height = lr
+			ctx.drawImage(imgList[imgIndex], (mouse[0] - r) * rate, (mouse[1] - r) * rate, lr, lr, 0, 0, lr, lr)
+			var dataUrl = canvas.toDataURL("image/jpeg");
+			var blob = dataURItoBlob(dataUrl)
+			imLoad()
+			saveAs(blob, fileName.hash().substr(0, 10) + '_' + cropIndex + '.jpg')
+			cropIndex += 1
+		}
+	</script>
+</body>
+
+</html>
